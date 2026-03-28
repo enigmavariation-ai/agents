@@ -24,6 +24,26 @@ jobs:
       - name: Install dependencies
         run: pip install anthropic google-auth google-auth-oauthlib google-api-python-client tavily-python requests python-dotenv
 
+      - name: Check secrets are set
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          CLICKUP_API_TOKEN: ${{ secrets.CLICKUP_API_TOKEN }}
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+        run: |
+          echo "ANTHROPIC_API_KEY set: ${{ secrets.ANTHROPIC_API_KEY != '' }}"
+          echo "TELEGRAM_BOT_TOKEN set: ${{ secrets.TELEGRAM_BOT_TOKEN != '' }}"
+          echo "TELEGRAM_CHAT_ID set: ${{ secrets.TELEGRAM_CHAT_ID != '' }}"
+          echo "CLICKUP_API_TOKEN set: ${{ secrets.CLICKUP_API_TOKEN != '' }}"
+          echo "TAVILY_API_KEY set: ${{ secrets.TAVILY_API_KEY != '' }}"
+          echo "GOOGLE_CLIENT_ID set: ${{ secrets.GOOGLE_CLIENT_ID != '' }}"
+          echo "GOOGLE_CLIENT_SECRET set: ${{ secrets.GOOGLE_CLIENT_SECRET != '' }}"
+          echo "GOOGLE_REFRESH_TOKEN set: ${{ secrets.GOOGLE_REFRESH_TOKEN != '' }}"
+
       - name: Run morning briefing
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
