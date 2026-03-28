@@ -3,6 +3,9 @@
 credentials.json
 token.json
 
+# Personal context (never commit)
+context/
+
 # Temporary processing files
 .tmp/
 
