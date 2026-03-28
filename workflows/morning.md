@@ -29,7 +29,14 @@ Execute in this exact order:
    - Only include threads that need a response or a decision
    - Skip: broadcast channels, bots, read-only groups
 
-5. **Fetch news** — Run web searches on the primary and secondary topics from `context/personal.md`.
+5. **Fetch ClickUp tasks** — Run `python3 tools/fetch_clickup.py` to get all Team Kanban tasks.
+   - Show Nik's tasks (IN PROGRESS, BLOCKED, TO DO) grouped under his name
+   - Show Jelena's tasks grouped under her name
+   - Show Fabi's tasks grouped under his name
+   - Flag anything BLOCKED across the whole team — surface the blocker if visible
+   - Skip RECURRING tasks and DONE tasks
+
+6. **Fetch news** — Run web searches on the primary and secondary topics from `context/personal.md`.
    - Do NOT include the user's name, company name, or contact details in queries
    - Cap at 3 items
    - Prioritize: competitive landscape, funding market, AI/tech, regulation
@@ -69,6 +76,23 @@ Drive:      "[Quote]" — [Author]
 💬 TELEGRAM
 - [Person / chat]: [What needs attention]
 (Only threads needing response or decision)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ TEAM KANBAN — [X] total tasks
+Nik: [X in progress / X to do / X blocked]
+- [🔄/📋/🚫] [task]
+- ✅ Recently completed: [task] (if completed in last 24h)
+
+Jelena: [X in progress / X to do / X blocked]
+- [🔄/📋/🚫] [task]
+- ✅ Recently completed: [task] (if completed in last 24h)
+
+Fabi: [X in progress / X to do / X blocked]
+- [🔄/📋/🚫] [task]
+- ✅ Recently completed: [task] (if completed in last 24h)
+
+⚠️ BLOCKED: [task] — [who / why if known]
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
