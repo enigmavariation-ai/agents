@@ -103,6 +103,7 @@ Each command maps to a workflow file. Read it before executing.
 | `/reply [context]` | `workflows/reply.md` | Summarize a thread and draft a reply |
 | `/week` | `workflows/week.md` | Weekly calendar preview and focus priorities |
 | `/news [topic]` | `workflows/news.md` | Quick news digest on a topic or default topics |
+| `/evening` | `workflows/evening.md` | Next-day preview: tomorrow's calendar, open threads, ClickUp closeout, top 3 for tomorrow |
 
 ### Hard Rules — Non-Negotiable
 
