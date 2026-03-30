@@ -104,6 +104,9 @@ Each command maps to a workflow file. Read it before executing.
 | `/week` | `workflows/week.md` | Weekly calendar preview and focus priorities |
 | `/news [topic]` | `workflows/news.md` | Quick news digest on a topic or default topics |
 | `/evening` | `workflows/evening.md` | Next-day preview: tomorrow's calendar, open threads, ClickUp closeout, top 3 for tomorrow |
+| `mark [task] done` | `workflows/clickup_tasks.md` | Close a ClickUp task by name |
+| `create task [name] for [person]` | `workflows/clickup_tasks.md` | Create a task with assignee |
+| `propose tasks` | `workflows/clickup_tasks.md` | Suggest missing tasks based on priorities, create on confirmation |
 
 ### Hard Rules — Non-Negotiable
 
