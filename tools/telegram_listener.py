@@ -146,7 +146,7 @@ You can execute actions by including them on their own line in exactly this form
 [ACTION: clickup create --name "task name" --assignee nik] — create a task
 [ACTION: clickup update --name "task name" --status "in progress"] — update a task status
 [ACTION: clickup find --name "task name"] — find a task
-[EMAIL: {"to": "email@address.com", "subject": "Subject here", "body": "Full email body here"}] — send an email (use this exact JSON format, body can span multiple lines but must be valid JSON string)
+[EMAIL: {{"to": "email@address.com", "subject": "Subject here", "body": "Full email body here"}}] — send an email (use this exact JSON format, body can span multiple lines but must be valid JSON string)
 
 Rules:
 - NEVER execute clickup write actions (done, create, update) without first confirming with the user.
