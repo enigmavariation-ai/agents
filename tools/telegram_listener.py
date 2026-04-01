@@ -122,6 +122,72 @@ def load_context() -> str:
     except Exception:
         return ''
 
+PENDING_FILE = os.path.join(BASE_DIR, '.tmp', 'pending_reply.json')
+
+def load_pending_reply() -> dict | None:
+    try:
+        with open(PENDING_FILE) as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+def clear_pending_reply():
+    try:
+        os.remove(PENDING_FILE)
+    except Exception:
+        pass
+
+def handle_send_pending(pending: dict) -> str:
+    try:
+        msg_id = send_email_direct(
+            to=pending['to'],
+            subject=pending['subject'],
+            body=pending['draft'],
+        )
+        clear_pending_reply()
+        print(f"Sent pending reply: {msg_id}")
+        return f"Sent to {pending['to'].split('<')[0].strip()}."
+    except Exception as e:
+        return f"Send failed: {e}"
+
+def handle_redraft_pending(pending: dict, direction: str) -> str:
+    try:
+        import anthropic as _anthropic
+        client = _anthropic.Anthropic(api_key=ANTHROPIC_KEY)
+        prompt = f"""Redraft this email reply for Nik (CEO of Surfaize). Direct, crisp, no filler.
+
+Original email was to: {pending['to']}
+Subject: {pending['subject']}
+
+Previous draft:
+{pending['draft']}
+
+New direction from Nik: {direction}
+
+Write ONLY the new email body. End with: Best, Nik"""
+
+        response = client.messages.create(
+            model='claude-sonnet-4-6',
+            max_tokens=500,
+            messages=[{'role': 'user', 'content': prompt}]
+        )
+        new_draft = response.content[0].text.strip()
+        pending['draft'] = new_draft
+
+        # Save updated draft
+        os.makedirs(os.path.dirname(PENDING_FILE), exist_ok=True)
+        with open(PENDING_FILE, 'w') as f:
+            json.dump(pending, f, indent=2)
+
+        return (
+            f"New draft:\n\n{new_draft}\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"Reply 'send' to send, 'edit: [direction]' to redraft again."
+        )
+    except Exception as e:
+        return f"Redraft failed: {e}"
+
+
 def ask_claude(user_message: str, conversation_history: list[dict]) -> tuple[str, list[str]]:
     """
     Send message to Claude with full agent context.
@@ -233,6 +299,15 @@ def add_to_history(role: str, content: str):
 def handle_message(text: str) -> str:
     text_stripped = text.strip()
     text_lower = text_stripped.lower()
+
+    # Handle pending email reply confirmations
+    pending = load_pending_reply()
+    if pending:
+        if text_lower == 'send':
+            return handle_send_pending(pending)
+        elif text_lower.startswith('edit:'):
+            direction = text_stripped[5:].strip()
+            return handle_redraft_pending(pending, direction)
 
     # Direct script commands — no confirmation needed
     if text_lower in ('morning', '/morning'):
