@@ -124,43 +124,58 @@ def load_context() -> str:
 
 PENDING_FILE = os.path.join(BASE_DIR, '.tmp', 'pending_reply.json')
 
-def load_pending_reply() -> dict | None:
+def load_all_pending() -> dict:
     try:
         with open(PENDING_FILE) as f:
             return json.load(f)
     except Exception:
-        return None
+        return {}
 
-def clear_pending_reply():
-    try:
-        os.remove(PENDING_FILE)
-    except Exception:
-        pass
+def get_pending(num: int) -> dict | None:
+    return load_all_pending().get(str(num))
 
-def handle_send_pending(pending: dict) -> str:
+def remove_pending(num: int):
+    pending = load_all_pending()
+    pending.pop(str(num), None)
+    with open(PENDING_FILE, 'w') as f:
+        json.dump(pending, f, indent=2)
+
+def update_pending(num: int, data: dict):
+    pending = load_all_pending()
+    pending[str(num)] = data
+    with open(PENDING_FILE, 'w') as f:
+        json.dump(pending, f, indent=2)
+
+def handle_send_pending(num: int) -> str:
+    entry = get_pending(num)
+    if not entry:
+        return f"No pending reply #{num}."
     try:
         msg_id = send_email_direct(
-            to=pending['to'],
-            subject=pending['subject'],
-            body=pending['draft'],
+            to=entry['to'],
+            subject=entry['subject'],
+            body=entry['draft'],
         )
-        clear_pending_reply()
-        print(f"Sent pending reply: {msg_id}")
-        return f"Sent to {pending['to'].split('<')[0].strip()}."
+        remove_pending(num)
+        print(f"Sent pending reply #{num}: {msg_id}")
+        return f"#{num} sent to {entry['to'].split('<')[0].strip()}."
     except Exception as e:
         return f"Send failed: {e}"
 
-def handle_redraft_pending(pending: dict, direction: str) -> str:
+def handle_redraft_pending(num: int, direction: str) -> str:
+    entry = get_pending(num)
+    if not entry:
+        return f"No pending reply #{num}."
     try:
         import anthropic as _anthropic
         client = _anthropic.Anthropic(api_key=ANTHROPIC_KEY)
         prompt = f"""Redraft this email reply for Nik (CEO of Surfaize). Direct, crisp, no filler.
 
-Original email was to: {pending['to']}
-Subject: {pending['subject']}
+Original email was to: {entry['to']}
+Subject: {entry['subject']}
 
 Previous draft:
-{pending['draft']}
+{entry['draft']}
 
 New direction from Nik: {direction}
 
@@ -172,17 +187,13 @@ Write ONLY the new email body. End with: Best, Nik"""
             messages=[{'role': 'user', 'content': prompt}]
         )
         new_draft = response.content[0].text.strip()
-        pending['draft'] = new_draft
-
-        # Save updated draft
-        os.makedirs(os.path.dirname(PENDING_FILE), exist_ok=True)
-        with open(PENDING_FILE, 'w') as f:
-            json.dump(pending, f, indent=2)
+        entry['draft'] = new_draft
+        update_pending(num, entry)
 
         return (
-            f"New draft:\n\n{new_draft}\n\n"
+            f"#{num} new draft:\n\n{new_draft}\n\n"
             f"━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"Reply 'send' to send, 'edit: [direction]' to redraft again."
+            f"Reply 'send {num}' to send or 'edit {num}: [direction]' to redraft again."
         )
     except Exception as e:
         return f"Redraft failed: {e}"
@@ -300,14 +311,14 @@ def handle_message(text: str) -> str:
     text_stripped = text.strip()
     text_lower = text_stripped.lower()
 
-    # Handle pending email reply confirmations
-    pending = load_pending_reply()
-    if pending:
-        if text_lower == 'send':
-            return handle_send_pending(pending)
-        elif text_lower.startswith('edit:'):
-            direction = text_stripped[5:].strip()
-            return handle_redraft_pending(pending, direction)
+    # Handle numbered pending email replies: 'send 1', 'edit 2: direction'
+    import re as _re
+    send_match = _re.match(r'^send\s+(\d+)$', text_lower)
+    edit_match = _re.match(r'^edit\s+(\d+):\s*(.+)$', text_stripped, _re.IGNORECASE)
+    if send_match:
+        return handle_send_pending(int(send_match.group(1)))
+    if edit_match:
+        return handle_redraft_pending(int(edit_match.group(1)), edit_match.group(2))
 
     # Direct script commands — no confirmation needed
     if text_lower in ('morning', '/morning'):

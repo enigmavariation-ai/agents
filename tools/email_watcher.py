@@ -113,10 +113,24 @@ def save_seen(seen: set):
     with open(STATE_FILE, 'w') as f:
         json.dump({'seen': seen_list}, f)
 
-def save_pending(email_data: dict):
+def load_pending() -> dict:
+    try:
+        with open(PENDING_FILE) as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+def save_pending_entry(email_data: dict) -> int:
+    """Add a pending reply and return its assigned number."""
     os.makedirs(os.path.dirname(PENDING_FILE), exist_ok=True)
+    pending = load_pending()
+    # Find next available number
+    existing = [int(k) for k in pending.keys()] if pending else [0]
+    next_num = max(existing) + 1
+    pending[str(next_num)] = email_data
     with open(PENDING_FILE, 'w') as f:
-        json.dump(email_data, f, indent=2)
+        json.dump(pending, f, indent=2)
+    return next_num
 
 # ── Gmail ─────────────────────────────────────────────────────────────────────
 
@@ -233,8 +247,8 @@ def main():
         # Extract sender name
         sender = email['from'].split('<')[0].strip().strip('"') or email['from']
 
-        # Save as pending reply (overwrite — one pending at a time)
-        save_pending({
+        # Save as numbered pending reply
+        num = save_pending_entry({
             'message_id': email['id'],
             'thread_id': email['thread_id'],
             'to': email['from'],
@@ -245,13 +259,13 @@ def main():
 
         # Send Telegram notification
         notification = (
-            f"📬 {sender} — {email['subject']}\n"
+            f"📬 #{num} {sender} — {email['subject']}\n"
             f"{email['snippet'][:200]}\n\n"
             f"━━━━━━━━━━━━━━━━━━━━━━━━━\n"
             f"Draft reply:\n\n"
             f"{draft}\n\n"
             f"━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"Reply 'send' to send, 'edit: [direction]' to redraft, or ignore."
+            f"Reply 'send {num}', 'edit {num}: [direction]', or ignore."
         )
         send_telegram(notification)
         seen.add(email['id'])
