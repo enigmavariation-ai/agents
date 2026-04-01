@@ -199,6 +199,48 @@ Write ONLY the new email body. End with: Best, Nik"""
         return f"Redraft failed: {e}"
 
 
+def fetch_recent_emails_summary() -> str:
+    """Fetch recent emails for live context in Claude queries."""
+    try:
+        from google.oauth2.credentials import Credentials
+        from google.auth.transport.requests import Request
+        from googleapiclient.discovery import build
+
+        creds = Credentials(
+            token=None,
+            refresh_token=os.environ['GOOGLE_REFRESH_TOKEN'],
+            token_uri='https://oauth2.googleapis.com/token',
+            client_id=os.environ['GOOGLE_CLIENT_ID'],
+            client_secret=os.environ['GOOGLE_CLIENT_SECRET'],
+            scopes=[
+                'https://www.googleapis.com/auth/gmail.readonly',
+                'https://www.googleapis.com/auth/gmail.send',
+                'https://www.googleapis.com/auth/calendar.readonly',
+            ],
+        )
+        creds.refresh(Request())
+        service = build('gmail', 'v1', credentials=creds)
+        results = service.users().messages().list(
+            userId='me',
+            q='newer_than:2d -category:promotions -category:social -from:noreply -from:notifications',
+            maxResults=15
+        ).execute()
+        messages = results.get('messages', [])
+        lines = []
+        for msg in messages:
+            detail = service.users().messages().get(
+                userId='me', id=msg['id'], format='metadata',
+                metadataHeaders=['From', 'Subject', 'Date']
+            ).execute()
+            headers = {h['name']: h['value'] for h in detail['payload']['headers']}
+            read = 'UNREAD' not in detail.get('labelIds', [])
+            status = 'read' if read else 'UNREAD'
+            lines.append(f"[{status}] {headers.get('From','')} — {headers.get('Subject','')} ({headers.get('Date','')})")
+        return '\n'.join(lines) if lines else 'No recent emails.'
+    except Exception as e:
+        return f'Email fetch unavailable: {e}'
+
+
 def ask_claude(user_message: str, conversation_history: list[dict]) -> tuple[str, list[str]]:
     """
     Send message to Claude with full agent context.
@@ -207,6 +249,7 @@ def ask_claude(user_message: str, conversation_history: list[dict]) -> tuple[str
     """
     context = load_context()
     clickup = run_clickup_fetch()
+    recent_emails = fetch_recent_emails_summary()
 
     system = f"""You are the personal Executive Assistant for Nik, CEO of Surfaize (AI OS for e-commerce brands, seed stage, Berlin). You are running as a Telegram bot on a VM.
 
@@ -215,6 +258,9 @@ Personal context:
 
 Current ClickUp board:
 {clickup}
+
+Recent emails (last 2 days):
+{recent_emails}
 
 You can execute actions by including them on their own line in exactly this format:
 [ACTION: morning] — trigger full morning briefing (it will be sent to Telegram separately)
