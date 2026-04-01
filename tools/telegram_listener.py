@@ -357,7 +357,8 @@ def execute_action(action: tuple) -> str:
         run_script('evening_briefing.py')
         return '🌙 Evening briefing sent.'
     elif cmd.startswith('clickup '):
-        args = cmd[8:].split()
+        import shlex
+        args = shlex.split(cmd[8:])
         return run_clickup_update(args)
     return f"Unknown action: {cmd}"
 
