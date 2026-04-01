@@ -1,3 +1,14 @@
-python-dotenv
-anthropic
-requests
+anthropic==0.87.0 \
+    --hash=sha256:e2669b86d42c739d3df163f873c51719552e263a3d85179297180fb4fa00a236
+google-api-python-client==2.193.0 \
+    --hash=sha256:c42aa324b822109901cfecab5dc4fc3915d35a7b376835233c916c70610322db
+google-auth==2.49.1 \
+    --hash=sha256:195ebe3dca18eddd1b3db5edc5189b76c13e96f29e73043b923ebcf3f1a860f7
+google-auth-oauthlib==1.3.1 \
+    --hash=sha256:1a139ef23f1318756805b0e95f655c238bffd29655329a2978218248da4ee7f8
+python-dotenv==1.2.2 \
+    --hash=sha256:1d8214789a24de455a8b8bd8ae6fe3c6b69a5e3d64aa8a8e5d68e694bbcb285a
+requests==2.33.1 \
+    --hash=sha256:4e6d1ef462f3626a1f0a0a9c42dd93c63bad33f9f1c1937509b8c5c8718ab56a
+tavily-python==0.7.23 \
+    --hash=sha256:52ef85c44b926bce3f257570cd32bc1bd4db54666acf3105617f27411a59e188
