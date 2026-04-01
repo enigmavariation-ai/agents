@@ -112,6 +112,7 @@ You can execute actions by including them on their own line in exactly this form
 [ACTION: clickup create --name "task name" --assignee nik] — create a task
 [ACTION: clickup update --name "task name" --status "in progress"] — update a task status
 [ACTION: clickup find --name "task name"] — find a task
+[ACTION: send_email --to "email@address.com" --subject "Subject" --body "Full email body"] — send an email
 
 Rules:
 - NEVER execute clickup write actions (done, create, update) without first confirming with the user.
@@ -157,6 +158,17 @@ def execute_action(action: str) -> str:
     elif action.startswith('clickup '):
         args = action[8:].split()
         return run_clickup_update(args)
+    elif action.startswith('send_email '):
+        # Format: send_email --to "x@y.com" --subject "S" --body "B"
+        import shlex
+        args = shlex.split(action[11:])
+        result = subprocess.run(
+            [PYTHON, os.path.join(TOOLS_DIR, 'send_gmail.py')] + args,
+            capture_output=True, text=True, cwd=BASE_DIR
+        )
+        if result.returncode == 0:
+            return 'Email sent.'
+        return f"Email failed: {result.stderr[:300]}"
     return f"Unknown action: {action}"
 
 # ── Conversation state ─────────────────────────────────────────────────────────
