@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3 -u
 """
 Telegram bot listener — two-way agent interface.
 Polls for messages, routes to scripts or Claude API, replies in Telegram.
@@ -41,6 +41,40 @@ def send_message(text: str):
             'chat_id': TELEGRAM_CHAT_ID,
             'text': chunk,
         })
+
+def send_email_direct(to: str, subject: str, body: str) -> str:
+    """Send email directly via Gmail API without subprocess."""
+    import base64
+    from email.mime.text import MIMEText
+    from google.oauth2.credentials import Credentials
+    from google.auth.transport.requests import Request
+    from googleapiclient.discovery import build
+
+    GOOGLE_CLIENT_ID     = os.environ['GOOGLE_CLIENT_ID']
+    GOOGLE_CLIENT_SECRET = os.environ['GOOGLE_CLIENT_SECRET']
+    GOOGLE_REFRESH_TOKEN = os.environ['GOOGLE_REFRESH_TOKEN']
+
+    creds = Credentials(
+        token=None,
+        refresh_token=GOOGLE_REFRESH_TOKEN,
+        token_uri='https://oauth2.googleapis.com/token',
+        client_id=GOOGLE_CLIENT_ID,
+        client_secret=GOOGLE_CLIENT_SECRET,
+        scopes=[
+            'https://www.googleapis.com/auth/gmail.readonly',
+            'https://www.googleapis.com/auth/gmail.send',
+            'https://www.googleapis.com/auth/calendar.readonly',
+        ],
+    )
+    creds.refresh(Request())
+    service = build('gmail', 'v1', credentials=creds)
+    msg = MIMEText(body, 'plain')
+    msg['to'] = to
+    msg['subject'] = subject
+    raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
+    result = service.users().messages().send(userId='me', body={'raw': raw}).execute()
+    return result.get('id', '')
+
 
 def get_updates(offset: int) -> list[dict]:
     try:
@@ -112,7 +146,7 @@ You can execute actions by including them on their own line in exactly this form
 [ACTION: clickup create --name "task name" --assignee nik] — create a task
 [ACTION: clickup update --name "task name" --status "in progress"] — update a task status
 [ACTION: clickup find --name "task name"] — find a task
-[ACTION: send_email --to "email@address.com" --subject "Subject" --body "Full email body"] — send an email
+[EMAIL: {"to": "email@address.com", "subject": "Subject here", "body": "Full email body here"}] — send an email (use this exact JSON format, body can span multiple lines but must be valid JSON string)
 
 Rules:
 - NEVER execute clickup write actions (done, create, update) without first confirming with the user.
@@ -135,42 +169,52 @@ Rules:
     )
     reply = response.content[0].text
 
-    # Parse any actions Claude wants to execute
+    # Parse [ACTION: ...] and [EMAIL: {...}] tags
+    import re
     actions = []
-    clean_lines = []
-    for line in reply.split('\n'):
-        if line.strip().startswith('[ACTION:') and line.strip().endswith(']'):
-            action = line.strip()[8:-1].strip()
-            actions.append(action)
-        else:
-            clean_lines.append(line)
+    clean_reply = reply
 
-    clean_reply = '\n'.join(clean_lines).strip()
+    # Extract [EMAIL: {...}] blocks (may span multiple lines)
+    email_pattern = re.compile(r'\[EMAIL:\s*(\{.*?\})\]', re.DOTALL)
+    for match in email_pattern.finditer(reply):
+        actions.append(('email', match.group(1)))
+    clean_reply = email_pattern.sub('', clean_reply)
+
+    # Extract [ACTION: ...] single-line tags
+    action_pattern = re.compile(r'\[ACTION:\s*(.+?)\]')
+    for match in action_pattern.finditer(reply):
+        actions.append(('action', match.group(1).strip()))
+    clean_reply = action_pattern.sub('', clean_reply)
+
+    clean_reply = clean_reply.strip()
     return clean_reply, actions
 
-def execute_action(action: str) -> str:
-    """Execute a parsed [ACTION: ...] command."""
-    if action == 'morning':
+def execute_action(action: tuple) -> str:
+    """Execute a parsed action tuple: ('action', cmd) or ('email', json_str)."""
+    kind, payload = action
+
+    if kind == 'email':
+        try:
+            data = json.loads(payload)
+            msg_id = send_email_direct(data['to'], data['subject'], data['body'])
+            print(f"Email sent: {msg_id} to {data['to']}")
+            return f"Email sent to {data['to']}."
+        except Exception as e:
+            print(f"Email error: {e}")
+            return f"Email failed: {e}"
+
+    # kind == 'action'
+    cmd = payload
+    if cmd == 'morning':
         run_script('morning_briefing.py')
         return '☕ Morning briefing sent.'
-    elif action == 'evening':
+    elif cmd == 'evening':
         run_script('evening_briefing.py')
         return '🌙 Evening briefing sent.'
-    elif action.startswith('clickup '):
-        args = action[8:].split()
+    elif cmd.startswith('clickup '):
+        args = cmd[8:].split()
         return run_clickup_update(args)
-    elif action.startswith('send_email '):
-        # Format: send_email --to "x@y.com" --subject "S" --body "B"
-        import shlex
-        args = shlex.split(action[11:])
-        result = subprocess.run(
-            [PYTHON, os.path.join(TOOLS_DIR, 'send_gmail.py')] + args,
-            capture_output=True, text=True, cwd=BASE_DIR
-        )
-        if result.returncode == 0:
-            return 'Email sent.'
-        return f"Email failed: {result.stderr[:300]}"
-    return f"Unknown action: {action}"
+    return f"Unknown action: {cmd}"
 
 # ── Conversation state ─────────────────────────────────────────────────────────
 
