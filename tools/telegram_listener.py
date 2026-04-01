@@ -199,8 +199,24 @@ Write ONLY the new email body. End with: Best, Nik"""
         return f"Redraft failed: {e}"
 
 
+def extract_body(payload: dict) -> str:
+    """Recursively extract plain text body from Gmail message payload."""
+    import base64
+    mime_type = payload.get('mimeType', '')
+    if mime_type == 'text/plain':
+        data = payload.get('body', {}).get('data', '')
+        if data:
+            return base64.urlsafe_b64decode(data).decode('utf-8', errors='replace')
+    if mime_type.startswith('multipart/'):
+        for part in payload.get('parts', []):
+            result = extract_body(part)
+            if result:
+                return result
+    return ''
+
+
 def fetch_recent_emails_summary() -> str:
-    """Fetch recent emails for live context in Claude queries."""
+    """Fetch recent emails with full body for live context in Claude queries."""
     try:
         from google.oauth2.credentials import Credentials
         from google.auth.transport.requests import Request
@@ -226,17 +242,23 @@ def fetch_recent_emails_summary() -> str:
             maxResults=15
         ).execute()
         messages = results.get('messages', [])
-        lines = []
+        entries = []
         for msg in messages:
             detail = service.users().messages().get(
-                userId='me', id=msg['id'], format='metadata',
-                metadataHeaders=['From', 'Subject', 'Date']
+                userId='me', id=msg['id'], format='full'
             ).execute()
             headers = {h['name']: h['value'] for h in detail['payload']['headers']}
-            read = 'UNREAD' not in detail.get('labelIds', [])
-            status = 'read' if read else 'UNREAD'
-            lines.append(f"[{status}] {headers.get('From','')} — {headers.get('Subject','')} ({headers.get('Date','')})")
-        return '\n'.join(lines) if lines else 'No recent emails.'
+            unread = 'UNREAD' in detail.get('labelIds', [])
+            status = 'UNREAD' if unread else 'read'
+            body = extract_body(detail['payload'])
+            body_preview = body.strip()[:600] if body else detail.get('snippet', '')[:300]
+            entries.append(
+                f"[{status}] From: {headers.get('From', '')}\n"
+                f"Subject: {headers.get('Subject', '')}\n"
+                f"Date: {headers.get('Date', '')}\n"
+                f"Body: {body_preview}"
+            )
+        return '\n\n---\n\n'.join(entries) if entries else 'No recent emails.'
     except Exception as e:
         return f'Email fetch unavailable: {e}'
 
